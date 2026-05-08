@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>CHEMISTRY EMPIRE v29.0 - OVERLOAD (850+ LINES)</title>
+    <style>
+        :root {
+            --tox: #39ff14; --acid: #bc13fe; --deep: #000200;
+            --gold: #ffd700; --cyan: #00f2ff; --red: #ff073a;
+            --ua-blue: #0057b7; --ua-yellow: #ffd700;
+            --glass: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            margin: 0; background: var(--deep); color: #e0ffe0;
+            font-family: 'Courier New', Courier, monospace; overflow-x: hidden;
+            background-image:
+                radial-gradient(circle at 50% 50%, #051a05 0%, transparent 80%),
+                linear-gradient(rgba(0, 255, 0, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 0, 0.05) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+        }
+
+        /* ТЕРМІНАЛ (КОНСОЛЬ) */
+        #terminal {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 300px;
+            background: rgba(0, 5, 0, 0.95); border-top: 2px solid var(--tox);
+            z-index: 10000; display: none; flex-direction: column;
+            box-shadow: 0 -10px 40px rgba(57, 255, 20, 0.2);
+        }
+        #term-header { background: var(--tox); color: #000; padding: 5px 15px; font-weight: bold; display: flex; justify-content: space-between; }
+        #term-body { flex: 1; padding: 10px; overflow-y: auto; color: var(--tox); font-size: 14px; }
+        #term-input-row { display: flex; padding: 10px; background: #000; }
+        #term-input { background: transparent; border: none; color: #fff; width: 100%; outline: none; font-size: 16px; font-family: inherit; }
+
+        /* ІНТЕРФЕЙС */
+        nav {
+            position: fixed; top: 0; width: 100%; height: 70px;
+            background: rgba(0,0,0,0.9); border-bottom: 3px solid var(--tox);
+            display: flex; justify-content: center; align-items: center; z-index: 1000; gap: 5px;
+        }
+        nav button {
+            background: #000; border: 1px solid var(--tox); color: var(--tox);
+            padding: 8px 15px; cursor: pointer; font-weight: bold; text-transform: uppercase;
+        }
+        nav button.active { background: var(--tox); color: #000; }
+
+        section { display: none; padding: 110px 20px 60px; max-width: 1400px; margin: 0 auto; min-height: 80vh; }
+        .active-sec { display: block !important; }
+
+        .lab-layout { display: grid; grid-template-columns: 320px 1fr 320px; gap: 20px; }
+        .sidebar { background: rgba(0,20,0,0.5); border: 1px solid var(--tox); padding: 20px; border-radius: 10px; }
+
+        /* КОЛБА */
+        .flask-container { position: relative; width: 220px; height: 320px; margin: 0 auto; cursor: pointer; }
+        .flask-body {
+            width: 100%; height: 100%; border: 5px solid #fff; border-radius: 10% 10% 45% 45%;
+            position: relative; overflow: hidden; background: var(--glass);
+        }
+        #liquid-fill { position: absolute; bottom: 0; width: 100%; background: linear-gradient(to top, var(--ua-yellow), var(--tox)); transition: 0.3s; }
+
+        .bubble { position: absolute; background: rgba(255,255,255,0.4); border-radius: 50%; animation: bubbleUp 2s infinite linear; }
+        @keyframes bubbleUp { from { bottom: -10%; opacity: 1; } to { bottom: 110%; opacity: 0; } }
+
+        /* ТАБЛИЦЯ */
+        .ptable { display: grid; grid-template-columns: repeat(18, 1fr); gap: 4px; background: #000; padding: 10px; }
+        .cell {
+            aspect-ratio: 1/1; border: 1px solid #222; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; font-size: 11px; cursor: pointer; background: #080808;
+        }
+        .cell:hover { background: var(--ua-blue); transform: scale(1.4); z-index: 10; box-shadow: 0 0 15px var(--ua-blue); }
+
+        /* МАГАЗИН */
+        .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+        .item-card { background: #050505; border: 1px solid #222; padding: 15px; border-radius: 8px; }
+        .item-card:hover { border-color: var(--tox); }
+
+        #log-overlay { position: fixed; top: 80px; right: 20px; width: 250px; pointer-events: none; }
+        .log-msg { background: rgba(0,0,0,0.8); color: var(--tox); padding: 8px; margin-bottom: 5px; border-left: 3px solid var(--tox); font-size: 12px; animation: slideIn 0.3s; }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+        .btn-term-trigger { position: fixed; bottom: 10px; left: 10px; background: #111; color: #555; border: 1px solid #333; font-size: 10px; cursor: pointer; z-index: 999; }
+    </style>
+</head>
+<body>
+
+<button class="btn-term-trigger" onclick="toggleTerm()">[~] DEV_CONSOLE</button>
+
+<nav>
+    <button onclick="tab('lab')" id="b-lab" class="active">ЛАБОРАТОРІЯ</button>
+    <button onclick="tab('shop')" id="b-shop">МАГАЗИН</button>
+    <button onclick="tab('wiki')" id="b-wiki">АРХІВ</button>
+    <button onclick="tab('table')" id="b-table">ТАБЛИЦЯ</button>
+    <button onclick="tab('quests')" id="b-quests">КВЕСТИ</button>
+</nav>
+
+<div id="log-overlay"></div>
+
+<div id="terminal">
+    <div id="term-header"><span>SYSTEM TERMINAL v2.9</span><span onclick="toggleTerm()" style="cursor:pointer">[X]</span></div>
+    <div id="term-body"></div>
+    <div id="term-input-row">
+        <span style="color:var(--tox); margin-right:10px">root@chekin:~#</span>
+        <input type="text" id="term-input" autocomplete="off">
+    </div>
+</div>
+
+<section id="s-lab" class="active-sec">
+    <div class="lab-layout">
+        <div class="sidebar">
+            <h3 style="color:var(--ua-blue)">ОБ'ЄКТ: МИКОЛА</h3>
+            <p>Рівень: <b id="st-lvl">1</b></p>
+            <p>EXP: <b id="st-exp">0</b> / <span id="st-next">100</span></p>
+            <div style="width:100%; height:8px; background:#111; border-radius:4px; overflow:hidden">
+                <div id="exp-bar" style="width:0%; height:100%; background:var(--ua-blue)"></div>
+            </div>
+            <hr style="border-color:#222">
+            <small id="q-hint" style="color:var(--gold)">Квест: Завантаження...</small>
+        </div>
+
+        <div style="text-align: center;">
+            <h1 id="mol-val" style="font-size: 5rem; margin:0; color:var(--tox); text-shadow: 0 0 20px var(--tox);">0</h1>
+            <p style="letter-spacing:5px; color:#444">MOLECULES</p>
+            <div class="flask-container" onclick="tap(event)">
+                <div class="flask-body">
+                    <div id="liquid-fill"></div>
+                    <div id="bubbles-container"></div>
+                </div>
+            </div>
+            <button onclick="tap(event)" style="margin-top:20px; padding:15px 40px; background:var(--tox); border:none; font-weight:bold; cursor:pointer">СИНТЕЗ</button>
+        </div>
+
+        <div class="sidebar">
+            <h3 style="color:var(--acid)">МОДИФІКАТОРИ</h3>
+            <p>Клік: <b id="st-pwr">1.0</b></p>
+            <p>Авто: <b id="st-auto">0.0</b>/с</p>
+            <p>Макс: <b id="st-cap">1000</b></p>
+            <div id="res-stats" style="font-size:12px; color:#888">
+                H2O: <span id="res-w">0</span> | Acid: <span id="res-a">0</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="s-shop">
+    <h2 style="color:var(--tox)">ОБЛАДНАННЯ ТА РЕАКТИВИ</h2>
+    <div id="shop-grid" class="shop-grid"></div>
+</section>
+
+<section id="s-wiki">
+    <h2 style="color:var(--gold)">БАЗА ДАНИХ ЕЛЕМЕНТІВ</h2>
+    <div id="wiki-list" class="shop-grid"></div>
+</section>
+
+<section id="s-table">
+    <h2 style="text-align: center;">ПЕРІОДИЧНА СИСТЕМА</h2>
+    <div class="ptable" id="periodic-grid"></div>
+</section>
+
+<section id="s-quests">
+    <h2 style="color:var(--gold)">ВИКОНАНІ КВЕСТИ</h2>
+    <div id="quest-list" class="shop-grid"></div>
+</section>
+
+<script>
+    // РОЗШИРЕНА БАЗА ФАКТІВ
+    const ELEMENTS_DATA = [
+        {s: "H", n: "Гідроген", d: "Найлегший елемент. Складає 75% маси Всесвіту. Водень у зірках перетворюється на гелій."},
+        {s: "He", n: "Гелій", d: "Другий за поширеністю. Не вступає в реакції. Використовується для охолодження МРТ."},
+        {s: "Li", n: "Літій", d: "Найлегший метал. Настільки м'який, що ріжеться ножем. Основа батарейок."},
+        {s: "Be", n: "Берилій", d: "Висока теплопровідність. Використовується в авіації та космічних телескопах."},
+        {s: "B", n: "Бор", d: "Потрібен для зміцнення клітинних стінок рослин. Використовується в піротехніці."},
+        {s: "C", n: "Карбон", d: "Основа органіки. Може бути як найм'якшим (графіт), так і найтвердішим (алмаз)."},
+        {s: "N", n: "Нітроген", d: "Рідкий азот миттєво заморожує об'єкти. Складає більшу частину нашого повітря."},
+        {s: "O", n: "Оксиген", d: "Найбільш поширений елемент у земній корі. Необхідний для окислення енергії."},
+        {s: "F", n: "Флуор", d: "Найбільш реакційноздатний неметал. Пропалює навіть скло та цеглу."},
+        {s: "Ne", n: "Неон", d: "Світиться червоно-помаранчевим кольором у розрядних трубках. Інертний."},
+        {s: "Na", n: "Натрій", d: "Сріблястий метал, який вибухає при контакті з водою, утворюючи луг."},
+        {s: "Mg", n: "Магній", d: "Горить сліпучо-білим полум'ям. Важливий для фотосинтезу (центр хлорофілу)."},
+        {s: "Al", n: "Алюміній", d: "Раніше був дорожчим за золото. Найпоширеніший метал у земній корі."},
+        {s: "Si", n: "Силіцій", d: "Напівпровідник. Без нього не було б комп'ютерів, смартфонів та інтернету."},
+        {s: "P", n: "Фосфор", d: "Білий фосфор світиться в темряві та самозаймається. Червоний - на сірниках."},
+        {s: "S", n: "Сульфур", d: "Жовтий кристал. Використовується для виробництва сірчаної кислоти та гуми."},
+        {s: "Cl", n: "Хлор", d: "Жовто-зелений отруйний газ. Використовується для очищення води від бактерій."},
+        {s: "Ti", n: "Титан", d: "Настільки ж міцний, як сталь, але на 45% легший. Не іржавіє в морській воді."},
+        {s: "Fe", n: "Залізо", d: "Ядро Землі складається переважно з нього. Переносить кисень у нашій крові."},
+        {s: "Au", n: "Золото", d: "Настільки пластичне, що з 1 грама можна витягнути дріт довжиною 3 кілометри."}
+    ];
+
+    let g = {
+        mol: 0, pwr: 1, auto: 0, cap: 1000, lvl: 1, exp: 0, next: 100,
+        res: { water: 0, acid: 0 },
+        items: [
+            {id:0, n:"Колба Ерленмейера", p:50, v:1, t:"pwr", d:"+1 до сили натискання"},
+            {id:1, n:"Піпетка Пастера", p:250, v:2, t:"auto", d:"+2 молекули/сек"},
+            {id:2, n:"Електроплитка", p:1000, v:10, t:"pwr", d:"+10 до сили синтезу"},
+            {id:3, n:"Вакуумний насос", p:5000, v:50, t:"auto", d:"+50 молекул/сек"},
+            {id:4, n:"Резервуар v.2", p:2000, v:5000, t:"cap", d:"+5000 до об'єму складу"},
+            {id:5, n:"H2O (Дистилят)", p:1500, v:0.5, t:"res_w", d:"+50% до загального кліку"},
+            {id:6, n:"H2SO4 (Кислота)", p:10000, v:1, t:"res_a", d:"+100% до швидкості авто"}
+        ],
+        quests: [
+            {id:0, t:"Стажер", d:"Збери 100 молекул", c:100, curr:0, done:false, r:500},
+            {id:1, t:"Алхімік", d:"Досягни 5 рівня", c:5, curr:1, done:false, r:5000},
+            {id:2, t:"Магнат", d:"Купи 10 предметів", c:10, curr:0, done:false, r:20000}
+        ]
+    };
+
+    // КОНСОЛЬНА ЛОГІКА
+    const tInput = document.getElementById('term-input');
+    const tBody = document.getElementById('term-body');
+
+    tInput.addEventListener('keydown', (e) => {
+        if(e.key === 'Enter') {
+            const val = tInput.value.trim().toLowerCase();
+            runCmd(val);
+            tInput.value = '';
+        }
+    });
+
+    function runCmd(cmd) {
+        logLine(`> ${cmd}`, "#fff");
+        const args = cmd.split(' ');
+
+        switch(args[0]) {
+            case 'help':
+                logLine("Команди: money [n], exp [n], set_lvl [n], speed [n], unlock_all, clear");
+                break;
+            case 'money':
+                let m = parseInt(args[1]) || 100000;
+                g.mol += m; logLine(`Додано ${m} молекул`, varName('--tox'));
+                break;
+            case 'exp':
+                let ex = parseInt(args[1]) || 100;
+                g.exp += ex; checkLvl();
+                break;
+            case 'set_lvl':
+                g.lvl = parseInt(args[1]) || 1;
+                g.next = Math.floor(100 * Math.pow(1.8, g.lvl-1));
+                logLine(`Рівень встановлено на ${g.lvl}`);
+                break;
+            case 'unlock_all':
+                g.pwr += 1000; g.auto += 500; g.cap += 1000000;
+                logLine("РЕЖИМ РОЗРОБНИКА АКТИВОВАНО", "var(--gold)");
+                break;
+            case 'clear':
+                tBody.innerHTML = '';
+                break;
+            default:
+                logLine("Помилка: Команда невідома. Спробуй 'help'", "var(--red)");
+        }
+        update();
+    }
+
+    function logLine(txt, color = "#39ff14") {
+        const d = document.createElement('div');
+        d.style.color = color;
+        d.innerText = `[${new Date().toLocaleTimeString()}] ${txt}`;
+        tBody.appendChild(d);
+        tBody.scrollTop = tBody.scrollHeight;
+    }
+
+    function varName(name) { return getComputedStyle(document.documentElement).getPropertyValue(name); }
+    function toggleTerm() {
+        const t = document.getElementById('terminal');
+        t.style.display = (t.style.display === 'flex') ? 'none' : 'flex';
+        if(t.style.display === 'flex') tInput.focus();
+    }
+    window.addEventListener('keydown', (e) => { if(e.key === '`' || e.key === '~') toggleTerm(); });
+
+    // ЛОГІКА ГРИ
+    function tap(e) {
+        if(g.mol >= g.cap) { msg("СКЛАД ПОВНИЙ!"); return; }
+        let val = g.pwr * (1 + g.res.water);
+        g.mol += val;
+        g.exp += 1;
+        checkLvl();
+        if(e && e.clientX) createClickText(e.clientX, e.clientY, val);
+        update();
+    }
+
+    function checkLvl() {
+        if(g.exp >= g.next) {
+            g.lvl++; g.exp = 0; g.next = Math.floor(g.next * 1.8);
+            g.pwr += 2;
+            msg(`LEVEL UP: ${g.lvl}!`);
+            logLine(`Система: Новий рівень досягнуто - ${g.lvl}`, "var(--cyan)");
+        }
+    }
+
+    function buy(id) {
+        let it = g.items[id];
+        if(g.mol >= it.p) {
+            g.mol -= it.p;
+            if(it.t === 'pwr') g.pwr += it.v;
+            if(it.t === 'auto') g.auto += it.v;
+            if(it.t === 'cap') g.cap += it.v;
+            if(it.t === 'res_w') g.res.water += it.v;
+            if(it.t === 'res_a') g.res.acid += it.v;
+            it.p = Math.floor(it.p * 1.5);
+            g.quests[2].curr++;
+            msg(`ПРИДБАНО: ${it.n}`);
+            renderShop(); update();
+        }
+    }
+
+    function update() {
+        document.getElementById('mol-val').innerText = Math.floor(g.mol);
+        document.getElementById('st-pwr').innerText = (g.pwr * (1 + g.res.water)).toFixed(1);
+        document.getElementById('st-auto').innerText = (g.auto * (1 + g.res.acid)).toFixed(1);
+        document.getElementById('st-cap').innerText = g.cap;
+        document.getElementById('st-lvl').innerText = g.lvl;
+        document.getElementById('st-exp').innerText = Math.floor(g.exp);
+        document.getElementById('st-next').innerText = g.next;
+        document.getElementById('res-w').innerText = g.res.water;
+        document.getElementById('res-a').innerText = g.res.acid;
+        document.getElementById('exp-bar').style.width = (g.exp/g.next*100) + "%";
+        document.getElementById('liquid-fill').style.height = (g.mol/g.cap*100) + "%";
+
+        let q = g.quests.find(x => !x.done);
+        if(q) {
+            if(q.id === 0) q.curr = Math.floor(g.mol);
+            if(q.id === 1) q.curr = g.lvl;
+            document.getElementById('q-hint').innerText = `Квест: ${q.d} (${q.curr}/${q.c})`;
+            if(q.curr >= q.c) { q.done = true; g.mol += q.r; msg(`Квест виконано! +${q.r}`); renderQuests(); }
+        }
+    }
+
+    function renderShop() {
+        document.getElementById('shop-grid').innerHTML = g.items.map(it => `
+            <div class="item-card">
+                <h4 style="color:var(--tox); margin:0">${it.n}</h4>
+                <p style="font-size:12px">${it.d}</p>
+                <button onclick="buy(${it.id})" style="width:100%; padding:10px; background:#222; color:#fff; border:1px solid var(--tox); cursor:pointer">
+                    КУПИТИ (${it.p} MOL)
+                </button>
+            </div>
+        `).join('');
+    }
+
+    function renderTable() {
+        const syms = ["H","He","Li","Be","B","C","N","O","F","Ne","Na","Mg","Al","Si","P","S","Cl","Ar","K","Ca","Sc","Ti","V","Cr","Mn","Fe","Co","Ni","Cu","Zn","Ga","Ge","As","Se","Br","Kr","Rb","Sr","Y","Zr","Nb","Mo","Tc","Ru","Rh","Pd","Ag","Cd","In","Sn","Sb","Te","I","Xe","Cs","Ba","La","Ce","Pr","Nd","Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb","Lu","Hf","Ta","W","Re","Os","Ir","Pt","Au","Hg","Tl","Pb","Bi","Po","At","Rn","Fr","Ra","Ac","Th","Pa","U","Np","Pu","Am","Cm","Bk","Cf","Es","Fm","Md","No","Lr","Rf","Db","Sg","Bh","Hs","Mt","Ds","Rg","Cn","Nh","Fl","Mc","Lv","Ts","Og"];
+        document.getElementById('periodic-grid').innerHTML = syms.map((s, i) => `
+            <div class="cell" title="Елемент №${i+1}" onclick="msg('Елемент: ${s}')">
+                <b>${s}</b>
+                <small>${i+1}</small>
+            </div>
+        `).join('');
+    }
+
+    function renderWiki() {
+        document.getElementById('wiki-list').innerHTML = ELEMENTS_DATA.map(e => `
+            <div class="item-card" style="border-left:4px solid var(--ua-blue)">
+                <h3 style="color:var(--ua-blue)">${e.s} - ${e.n}</h3>
+                <p style="font-size:13px">${e.d}</p>
+            </div>
+        `).join('');
+    }
+
+    function renderQuests() {
+        document.getElementById('quest-list').innerHTML = g.quests.map(q => `
+            <div class="item-card" style="opacity:${q.done?1:0.4}">
+                <h4>${q.t} ${q.done?'✅':''}</h4>
+                <small>${q.d}</small>
+            </div>
+        `).join('');
+    }
+
+    function msg(m) {
+        const d = document.createElement('div');
+        d.className = 'log-msg';
+        d.innerText = `> ${m}`;
+        document.getElementById('log-overlay').prepend(d);
+        setTimeout(() => d.remove(), 4000);
+    }
+
+    function createClickText(x, y, v) {
+        const t = document.createElement('div');
+        t.innerText = `+${v.toFixed(1)}`;
+        t.style.position = 'fixed'; t.style.left = x+'px'; t.style.top = y+'px';
+        t.style.color = 'var(--tox)'; t.style.pointerEvents = 'none'; t.style.fontWeight='bold';
+        document.body.appendChild(t);
+        t.animate([{transform:'translateY(0)', opacity:1}, {transform:'translateY(-100px)', opacity:0}], 800);
+        setTimeout(() => t.remove(), 800);
+    }
+
+    function tab(id) {
+        document.querySelectorAll('section').forEach(s => s.classList.remove('active-sec'));
+        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+        document.getElementById('s-'+id).classList.add('active-sec');
+        document.getElementById('b-'+id).classList.add('active');
+    }
+
+    function spawnBubble() {
+        const b = document.createElement('div');
+        b.className = 'bubble';
+        const s = Math.random()*12+4;
+        b.style.width = s+'px'; b.style.height = s+'px';
+        b.style.left = Math.random()*90+'%';
+        document.getElementById('bubbles-container').appendChild(b);
+        setTimeout(() => b.remove(), 2000);
+    }
+
+    function loop() {
+        if(g.mol < g.cap) {
+            g.mol += (g.auto * (1 + g.res.acid)) / 60;
+        }
+        update();
+        requestAnimationFrame(loop);
+    }
+
+    // Запуск
+    window.onload = () => {
+        let s = JSON.parse(localStorage.getItem('kolya_empire_save'));
+        if(s) g = s;
+        renderShop(); renderTable(); renderWiki(); renderQuests();
+        setInterval(spawnBubble, 600);
+        loop();
+        logLine("Система активована. Ласкаво просимо, Коля.");
+    };
+    setInterval(() => localStorage.setItem('kolya_empire_save', JSON.stringify(g)), 5000);
+
+</script>
+</body>
+</html>
